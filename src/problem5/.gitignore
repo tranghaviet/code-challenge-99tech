@@ -1,0 +1,6 @@
+node_modules/
+dist/
+database.db
+coverage/
+.env
+swagger_output.json
