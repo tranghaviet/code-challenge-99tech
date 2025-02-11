@@ -1,0 +1,76 @@
+@startuml
+actor Client
+participant "API Service" as API
+participant "Redis" as Cache
+participant "Kafka" as MQ
+participant "PostgreSQL" as DB
+participant "WebSocket Server" as WS
+
+Client -> API: POST /update-score {playerId, scoreDelta} (with JWT)
+activate API
+
+API -> API: Verify JWT
+alt JWT Invalid
+    API --> Client: 401 Unauthorized
+else JWT Valid
+    API -> API: Check Rate Limit (Redis)
+    alt Rate Limit Exceeded
+        API --> Client: 429 Too Many Requests
+    else Rate Limit OK
+        API -> Cache: INCRBY player:{playerId}:score, scoreDelta
+        activate Cache
+        Cache --> API: newScore
+        deactivate Cache
+
+        API -> Cache: ZADD leaderboard, newScore, playerId
+        activate Cache
+        deactivate Cache
+
+        API -> MQ: Publish score-updates {playerId, scoreDelta}
+        activate MQ
+        MQ --> WS: score-updates {playerId, scoreDelta}
+        activate WS
+        WS -> WS: Construct WS Message
+        WS --> Client: WS Message: {type: "scoreUpdate", playerId, newScore}
+          deactivate WS
+        deactivate MQ
+
+
+        API --> Client: 200 OK {playerId, newScore}
+    end
+end
+
+deactivate API
+
+Client -> API: GET /leaderboard?limit=N
+activate API
+API -> Cache: ZREVRANGE leaderboard, 0, N-1, WITHSCORES
+activate Cache
+Cache --> API: Leaderboard Data (or empty)
+deactivate Cache
+alt Cache Hit
+    API --> Client: 200 OK [Leaderboard Data]
+else Cache Miss
+    API -> DB: SELECT playerId, score FROM scores ORDER BY score DESC LIMIT N
+    activate DB
+    DB --> API: Leaderboard Data
+    deactivate DB
+    API -> Cache: ZADD leaderboard, score, playerId (for each entry)
+    API --> Client: 200 OK [Leaderboard Data]
+end
+deactivate API
+
+Client -> WS: Connect /live-updates
+activate WS
+WS --> Client: Connection Established
+deactivate WS
+
+note over DB: PostgreSQL (TimescaleDB)\nscores table:\n- player_id (PK)\n- score\n- updated_at
+note over MQ: Kafka\n- score-updates topic
+
+participant "Background Worker\n(Kafka Consumer)" as Worker
+MQ --> Worker: score-updates {playerId, scoreDelta}
+activate Worker
+Worker -> DB:  INSERT INTO scores ... ON CONFLICT ...
+deactivate Worker
+@enduml
