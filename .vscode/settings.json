@@ -1,0 +1,16 @@
+{
+    "jestrunner.debugOptions": {
+      "runtimeArgs": [
+        "--experimental-vm-modules",
+        "--no-deprecation"
+      ]
+    },
+    "jestrunner.jestCommand": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "jestrunner.codeLensSelector": "**/*.{test,spec}.{js,jsx,ts,tsx}",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    "editor.mouseWheelZoom": true
+  }
+  
