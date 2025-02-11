@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/resources', resourceRoutes);
+app.use('/api', resourceRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
 app.listen(port, () => {
